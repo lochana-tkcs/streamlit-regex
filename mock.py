@@ -58,7 +58,7 @@ def apply_regex(data, pattern, col):
 
 # Streamlit app
 def streamlit_app():
-    st.title("Text Operation")
+    st.title("Intent Based Regex Generation")
 
     # Upload CSV file
     uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
@@ -78,6 +78,7 @@ def streamlit_app():
         Your task is to generate an accurate and efficient regular expression (regex)
         based on the user's request for manipulating values in a dataset column.
         The regex should extract only the relevant information according to the user's intent.
+        But if the prompt given is invalid/nonsensical, output saying "Sorry, I couldn't understand your request. Can you please try again?"
         Example 1: Extract the month from a date like 12/01/1990. Expected output: 01
         Example 2: Extract everything before the first '.' in an IP address such as 192.168.1.1. Expected output: 192
 
@@ -93,25 +94,27 @@ def streamlit_app():
 
         # Button to generate the regex
         if st.button("Generate Regex"):
-            st.session_state["regex_pattern"], st.session_state["example_output"] = generate_regex(df, prompt_template,
-                                                                                                   column)
+            st.session_state["regex_pattern"], st.session_state["example_output"] = generate_regex(df, prompt_template, column)
 
         # Only show regex and example after generation and keep showing after applying
         if st.session_state["regex_pattern"]:
-            st.write(f"Generated Regex: `{st.session_state['regex_pattern']}`")
-            st.write(f"Example: {st.session_state['example_output']}")
+            # Check if the regex generation failed or produced a misunderstanding response
+            if "Sorry, I couldn't understand your request" in st.session_state["regex_pattern"]:
+                st.warning(st.session_state["regex_pattern"])
+            else:
+                st.write(f"Generated Regex: `{st.session_state['regex_pattern']}`")
+                st.write(f"Example: {st.session_state['example_output']}")
 
-        # Show the "Apply Regex" button only if the regex is generated
-        if st.session_state["regex_pattern"]:
-            if st.button("Apply Regex"):
-                updated_df = apply_regex(df, st.session_state["regex_pattern"], column)
-                if updated_df is not None:
-                    st.write("Updated Dataset:")
-                    st.dataframe(updated_df)
+                # Show the "Apply Regex" button only if a valid regex is generated
+                if st.button("Apply Regex"):
+                    updated_df = apply_regex(df, st.session_state["regex_pattern"], column)
+                    if updated_df is not None:
+                        st.write("Updated Dataset:")
+                        st.dataframe(updated_df)
 
-                    # Option to download the updated CSV file
-                    csv = updated_df.to_csv(index=False).encode('utf-8')
-                    st.download_button("Download Updated CSV", csv, "updated_data.csv", "text/csv")
+                        # Option to download the updated CSV file
+                        csv = updated_df.to_csv(index=False).encode('utf-8')
+                        st.download_button("Download Updated CSV", csv, "updated_data.csv", "text/csv")
 
 
 # Run the Streamlit app
