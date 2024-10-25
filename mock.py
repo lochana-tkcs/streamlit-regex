@@ -39,7 +39,7 @@ def generate_regex(data, prompt, col):
     # Pick a random sample from the column to demonstrate the regex
     random_value = str(random.choice(data[col].dropna()))
     match = re.search(pattern, random_value)
-    example_result = f"{random_value} will become {match.group(0)}" if match else "No match found"
+    example_result = f"'{random_value}' will become '{match.group(0)}'" if match else "No match found"
 
     return pattern, example_result
 
