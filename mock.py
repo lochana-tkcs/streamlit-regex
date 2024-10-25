@@ -56,7 +56,7 @@ def apply_regex(data, pattern, col):
     return data
 
 
-# Streamlit app
+# Streamlit app with custom styling
 def streamlit_app():
     st.title("Intent Based Regex Generation")
 
@@ -102,8 +102,20 @@ def streamlit_app():
             if "Sorry, I couldn't understand your request" in st.session_state["regex_pattern"]:
                 st.warning(st.session_state["regex_pattern"])
             else:
-                st.write(f"Generated Regex: `{st.session_state['regex_pattern']}`")
-                st.write(f"Example: {st.session_state['example_output']}")
+                st.markdown(f"**Generated Regex:** `{st.session_state['regex_pattern']}`")
+                
+                # Styling example and message separately, using same font for example as the regex
+                st.markdown(
+                    f"""
+                    <div style="font-size:16px; font-family:monospace; margin-top:10px;">
+                        <b>Example:</b> <code>{st.session_state['example_output']}</code>
+                    </div>
+                    <div style="font-size:14px; color:gray; font-style:italic; margin-top:10px;">
+                        If the example isn't as expected, try providing more details in your request.
+                    </div>
+                    <div style="margin-bottom:20px;"></div>
+                    """, unsafe_allow_html=True
+                )
 
                 # Show the "Apply Regex" button only if a valid regex is generated
                 if st.button("Apply Regex"):
