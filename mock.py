@@ -12,6 +12,27 @@ client = OpenAI(
     api_key=api_key)
 
 
+def apply_regex1(text: str, pattern: str, match_count: int, mode: str = 'findall'):
+    try:
+        if mode == 'findall':
+            return ' '.join(
+            [''.join(match) if isinstance(match, tuple) else match for match in re.findall(pattern, text)])
+        elif mode == 'search':
+            match = re.search(pattern, text)
+            if match:
+                return match.group(match_count) if match else None
+        # elif mode == 'match':
+        #     match = re.search(pattern, text)
+        #     if match:
+        #         return match.group(match_count) if match else None
+        # elif mode == 'replace':
+        #     return re.sub(pattern, replace_with, text)
+        else:
+            raise ValueError("Invalid mode. Choose 'findall', 'search', 'match', or 'replace'.")
+    except re.error as e:
+        print(f"Invalid regex pattern: {e}")
+        return None
+
 def generate_regex(data, prompt, col):
     column_values = [str(row) for row in data[col].head(20)]
     all_values_str = ", ".join(column_values)
@@ -20,7 +41,7 @@ def generate_regex(data, prompt, col):
     prompt += f"\nColumn: {col}\n"
     prompt += "Values:\n" + all_values_str + "\n"
 
-    prompt += "\nGiven the intent for the column, just give the expression (as a string) and no other text."
+    prompt += "\nGiven the intent for the column, Return a dictionary with 'pattern' as the regex pattern string, 'mode' selected as search (for finding the first occurrence), findall (for multiple matches), or replace (for substitutions), and 'match_count' as the capturing group index to return. No other text."
 
     # Call to GPT model to generate regex
     response = client.chat.completions.create(
@@ -29,30 +50,81 @@ def generate_regex(data, prompt, col):
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": prompt}
         ],
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "pattern_matching",
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "pattern": {
+                            "type": "string",
+                            "description": "Regular expression pattern for matching specific text formats",
+                        },
+                        "mode": {
+                            "type": "string",
+                            "enum": ["search", "findall", "replace"],
+                            "description": "Mode of regex operation",
+                            "value": "findall"
+                        },
+                        "match_count": {
+                            "type": "integer",
+                            "description": "the number corresponds to the index of the capturing group in the regular expression pattern, starting from 1 for the first group",
+                        }
+                    },
+                    "required": ["pattern", "mode", "match_count"],
+                    "additionalProperties": False
+                },
+                "strict": True
+            }
+        },
         max_tokens=1000,
         temperature=0
     )
 
     # Extract regex from the response
-    pattern = response.choices[0].message.content.strip().replace('`', '')
+    dictionary = response.choices[0].message.content.strip().replace('`', '')
+    dictionary = json.loads(dictionary)
+    # print(dictionary)
 
-    # Pick a random sample from the column to demonstrate the regex
-    random_value = str(random.choice(data[col].dropna()))
-    match = re.search(pattern, random_value)
-    example_result = f"'{random_value}' will become '{match.group(0)}'" if match else "No match found"
+    non_na_values = data[col].dropna().tolist()[:20]
 
-    return pattern, example_result
+    if not non_na_values:
+        print("No non-NaN values available in the column.")
+        return None  # or set a default result, e.g., ""
+
+    example_result = None
+
+    # Process values sequentially
+    for value in non_na_values:
+        matches = apply_regex1(str(value), str(dictionary.get('pattern')), dictionary.get("match_count"),
+                               dictionary.get('mode'))
+        if matches:
+            example_result = f"'{value}' will become '{matches}'"
+            break
+
+    if example_result is None:
+        example_result = "No match found after checking 20 values. Click on apply to check further."
+
+    # print(example_result)
+
+    return str(dictionary.get('pattern')), example_result, dictionary
 
 
-def apply_regex(data, pattern, col):
+def apply_regex(data, col, dic):
     # Apply the regex pattern on the column using the `regex` module
     try:
-        data[f'{col}_regex'] = data[col].apply(
-            lambda x: re.search(pattern, str(x)).group(0) if re.search(pattern, str(x)) else x)
+        if dic.get('mode') == 'findall':
+            data[f'{col}_regex'] = data[col].apply(lambda x: ' '.join([''.join(match) if isinstance(match, tuple) else match for match in re.findall(str(dic.get('pattern')), str(x))]))
+        elif dic.get('mode') == 'search':
+            data[f'{col}_regex'] = data[col].apply(lambda x: re.search(str(dic.get('pattern')), str(x)).group(dic.get("match_count")) if re.search(str(dic.get('pattern')), str(x)) else None)
+        # elif dic.get('mode') == 'match':
+        #     data[f'{col}_regex'] = data[col].apply(
+        #         lambda x: re.search(str(dic.get('pattern')), str(x)).group() if re.search(
+        #             str(dic.get('pattern')), str(x)) else None)
     except re.error as e:
         st.error(f"Error applying regex pattern: {e}")
         return None
-
     return data
 
 
@@ -75,15 +147,21 @@ def streamlit_app():
 
         # Define the prompt template for the regex generation
         prompt_template = f"""
-        Your task is to generate an accurate and efficient regular expression (regex)
-        based on the user's request for manipulating values in a dataset column.
-        The regex should extract only the relevant information according to the user's intent.
-        But if the prompt given is invalid/nonsensical, output saying "Sorry, I couldn't understand your request. Can you please try again?"
-        Example 1: Extract the month from a date like 12/01/1990. Expected output: 01
-        Example 2: Extract everything before the first '.' in an IP address such as 192.168.1.1. Expected output: 192
+        Your task is to generate a precise and efficient regular expression (regex) that fulfills the user's specific request for processing values in a dataset column. 
+        Ensure the regex:
+        1. Captures only the specified information with minimal complexity.
+        2. Avoids any unnecessary matches or complex patterns that do not contribute to accuracy.
+        3. Works for typical variations in formatting as seen in the column values provided.
+
+        Examples:
+        1. Extract the month from a date like "12/01/1990". Expected output: "01"
+        2. Extract everything before the first '.' in an IP address such as "192.168.1.1". Expected output: "192"
+        3. Give the second word in a sentence like "This is great work.". Expected output: "is"
+        4. Give the 5 words from the beginning in a sentence like "Received different specification & defective charging cable". Expected output: "Received different specification & defective"
+        5. Give me the last 2 words or 2 words from the end in a sentence like "This is great work." Expected output: "great work"
 
         User intent: {intent}
-        The column values are as follows:
+        Column sample values:
         """
 
         # Initialize session state to store regex pattern and example output
@@ -94,7 +172,8 @@ def streamlit_app():
 
         # Button to generate the regex
         if st.button("Generate Regex"):
-            st.session_state["regex_pattern"], st.session_state["example_output"] = generate_regex(df, prompt_template, column)
+            st.session_state["regex_pattern"], st.session_state["example_output"], st.session_state["dictionary"] = generate_regex(df, prompt_template,
+                                                                                                   column)
 
         # Only show regex and example after generation and keep showing after applying
         if st.session_state["regex_pattern"]:
@@ -103,7 +182,7 @@ def streamlit_app():
                 st.warning(st.session_state["regex_pattern"])
             else:
                 st.markdown(f"**Generated Regex:** `{st.session_state['regex_pattern']}`")
-                
+
                 # Styling example and message separately, using same font for example as the regex
                 st.markdown(
                     f"""
@@ -119,7 +198,7 @@ def streamlit_app():
 
                 # Show the "Apply Regex" button only if a valid regex is generated
                 if st.button("Apply Regex"):
-                    updated_df = apply_regex(df, st.session_state["regex_pattern"], column)
+                    updated_df = apply_regex(df, column, st.session_state["dictionary"])
                     if updated_df is not None:
                         st.write("Updated Dataset:")
                         st.dataframe(updated_df)
