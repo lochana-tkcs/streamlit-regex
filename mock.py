@@ -3,6 +3,7 @@ import pandas as pd
 import regex as re  # Use the `regex` module for advanced regular expressions
 from openai import OpenAI
 import random
+import json
 
 # Set your OpenAI API key
 api_key = st.secrets["openai_api_key"]
