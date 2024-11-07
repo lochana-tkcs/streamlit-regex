@@ -12,7 +12,6 @@ api_key = st.secrets["openai_api_key"]
 client = OpenAI(
     api_key=api_key)
 
-
 def apply_regex1(text: str, pattern: str, match_count: int, mode: str = 'findall'):
     try:
         if mode == 'findall':
@@ -86,7 +85,7 @@ def generate_regex(data, prompt, col):
     # Extract regex from the response
     dictionary = response.choices[0].message.content.strip().replace('`', '')
     dictionary = json.loads(dictionary)
-    # print(dictionary)
+    print(dictionary)
 
     non_na_values = data[col].dropna().tolist()[:20]
 
@@ -107,7 +106,7 @@ def generate_regex(data, prompt, col):
     if example_result is None:
         example_result = "No match found after checking 20 values. Click on apply to check further."
 
-    # print(example_result)
+    print(example_result)
 
     return str(dictionary.get('pattern')), example_result, dictionary
 
@@ -149,8 +148,12 @@ def streamlit_app():
         # Define the prompt template for the regex generation
         prompt_template = f"""
         Your task is to generate a precise and efficient regular expression (regex) that fulfills the user's specific request for processing values in a dataset column. 
+        
+        **nth character of mth word - Instructions**
+        Extract the nth character in the mth word: Regex: ^(?:\\b\\S+\\b\\s+){{m-1}}\\b\\S{{n-1}}(\\S)
+       
         Ensure the regex:
-        1. Captures only the specified information with minimal complexity.
+        1. Locate a specific word based on its position within the text (e.g., the second word in a phrase) and capture a particular character within that word (e.g., the fourth letter of the second word).
         2. Avoids any unnecessary matches or complex patterns that do not contribute to accuracy.
         3. Works for typical variations in formatting as seen in the column values provided.
 
