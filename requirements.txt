@@ -1,4 +1,5 @@
 streamlit
-openai==1.44.1
+openai==1.55.3
 pandas
 regex
+httpx==0.27.2
