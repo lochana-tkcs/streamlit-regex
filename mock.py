@@ -41,7 +41,7 @@ def generate_regex(data, prompt, col):
     prompt += f"\nColumn: {col}\n"
     prompt += "Values:\n" + all_values_str + "\n"
 
-    prompt += "\nGiven the intent for the column, Return a dictionary with 'pattern' as the regex pattern string, 'mode' selected as search (for finding the first occurrence), findall (for multiple matches), or replace (for substitutions), and 'match_count' as the capturing group index to return. No other text."
+    prompt += "\nGiven the intent for the column, Return a dictionary with 'pattern' as the regex pattern string, 'mode' selected as search (for finding the first occurrence), or findall (for multiple matches), and 'match_count' as the capturing group index to return. No other text."
 
     # Call to GPT model to generate regex
     response = client.chat.completions.create(
