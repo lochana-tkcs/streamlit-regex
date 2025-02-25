@@ -45,7 +45,7 @@ def generate_regex(data, prompt, col):
 
     # Call to GPT model to generate regex
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-4o",
         messages=[
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": prompt}
@@ -148,22 +148,12 @@ def streamlit_app():
         # Define the prompt template for the regex generation
         prompt_template = f"""
         Your task is to generate a precise and efficient regular expression (regex) that fulfills the user's specific request for processing values in a dataset column. 
-        
-        **nth character of mth word - Instructions**
-        Extract the nth character in the mth word: Regex: ^(?:\\b\\S+\\b\\s+){{m-1}}\\b\\S{{n-1}}(\\S)
        
         Ensure the regex:
         1. Locate a specific word based on its position within the text (e.g., the second word in a phrase) and capture a particular character within that word (e.g., the fourth letter of the second word).
         2. Avoids any unnecessary matches or complex patterns that do not contribute to accuracy.
         3. Works for typical variations in formatting as seen in the column values provided.
-
-        Examples:
-        1. Extract the month from a date like "12/01/1990". Expected output: "01"
-        2. Extract everything before the first '.' in an IP address such as "192.168.1.1". Expected output: "192"
-        3. Give the second word in a sentence like "This is great work.". Expected output: "is"
-        4. Give the 5 words from the beginning in a sentence like "Received different specification & defective charging cable". Expected output: "Received different specification & defective"
-        5. Give me the last 2 words or 2 words from the end in a sentence like "This is great work." Expected output: "great work"
-
+        
         User intent: {intent}
         Column sample values:
         """
